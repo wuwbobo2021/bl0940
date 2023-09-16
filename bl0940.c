@@ -104,13 +104,24 @@ bool bl0940_get_readings(BL0940* bl0940)
 	bl0940->temp_internal = get_triple_bytes(rx_data + BL0940_Readings_Pos_Temp_Internal);
 	bl0940->temp_internal = (170.0/448)*(bl0940->temp_internal/2 - 32) - 45;
 	
-	float data_angle = read_register(bl0940, BL0940_Reg_Addr_Angle) & 0xFFFF;
-	if (bl0940->error) return false;
-	
-	data_angle *= (bl0940->setting_ac_freq == BL0940_AC_Freq_50Hz ? 50 : 60);
-	data_angle /= BL0940_Freq_Sample;
-	bl0940->phase_angle = 360.0*data_angle;
-	bl0940->power_factor = cos(2*PI*data_angle);
+	if (bl0940->calc_stable_angle == false
+	||  bl0940->setting_filter != BL0940_Filter_AC_Pass) {
+		float data_angle = (uint16_t)(read_register(bl0940, BL0940_Reg_Addr_Angle) & 0xFFFF);
+		if (bl0940->error) return false;
+		
+		data_angle *= (bl0940->setting_ac_freq == BL0940_AC_Freq_50Hz ? 50 : 60);
+		data_angle /= BL0940_Freq_Sample;
+		bl0940->phase_angle = 360.0*data_angle;
+		bl0940->power_factor = cos(2*PI*data_angle);
+	} else {
+		float ui = bl0940->voltage * bl0940->current;
+		if (ui > 0) {
+			bl0940->power_factor = bl0940->power / ui;
+			if (bl0940->power_factor > 1) bl0940->power_factor = 1;
+		} else
+			bl0940->power_factor = 1;
+		bl0940->phase_angle = acos(bl0940->power_factor)*360.0/(2*PI);
+	}
 	
 	return true;
 }

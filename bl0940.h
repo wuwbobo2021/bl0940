@@ -39,8 +39,9 @@ typedef enum {
 typedef struct {
 	uint8_t uart_port_num;
 	
-	float voltage_divider; // = (R2 + R1)/R1, the input is voltage on R1
+	float voltage_divider; // = (R2 + R1)/R1, the input is voltage on R1.
 	float r_shunt_ohm; //for example: 0.001 ohm
+	bool calc_stable_angle; //calculate power factor here instead of reading from BL0940 (AC only)
 	
 	// call bl0940_apply_settings() after changing values below
 	BL0940_Filter setting_filter;
