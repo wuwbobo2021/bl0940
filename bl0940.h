@@ -59,9 +59,10 @@ typedef struct {
 	float temp_internal;
 } BL0940;
 
-// implement them as synchronous functions outside this module
-extern bool bl0940_uart_send(uint8_t port_num, char* data, uint8_t cnt);
-extern uint8_t bl0940_uart_receive(uint8_t port_num, char* data, uint8_t cnt, uint16_t timeout_ms);
+// implement them as synchronous functions outside this module.
+// it is better to clear the Rx buffer before sending data in bl0940_uart_send().
+extern bool bl0940_uart_send(uint8_t port_num, const void* data, uint8_t cnt);
+extern uint8_t bl0940_uart_receive(uint8_t port_num, void* data, uint8_t cnt, uint16_t timeout_ms);
 
 extern bool bl0940_apply_settings(BL0940* bl0940);
 extern bool bl0940_get_readings(BL0940* bl0940);

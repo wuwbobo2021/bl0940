@@ -46,6 +46,7 @@
 static uint32_t read_register(BL0940* bl0940, uint8_t reg_addr);
 static bool write_register(BL0940* bl0940, uint8_t reg_addr, uint32_t val);
 static uint16_t bytes_sum(void* data, uint8_t cnt);
+static uint8_t get_sum_byte(uint16_t sum);
 static void set_triple_bytes(uint8_t* data, uint32_t val);
 static uint32_t get_triple_bytes(const uint8_t* data);
 static void set_bits(uint32_t* p_reg, uint32_t val, uint8_t pos, uint8_t size);
@@ -69,13 +70,13 @@ bool bl0940_get_readings(BL0940* bl0940)
 {
 	bl0940->error = BL0940_Error_None;
 	
-	char tx_data[] = {BL0940_Head_Read, BL0940_Get_Readings};
+	uint8_t tx_data[] = {BL0940_Head_Read, BL0940_Get_Readings};
 	if (! bl0940_uart_send(bl0940->uart_port_num, tx_data, sizeof(tx_data))) {
 		bl0940->error = BL0940_Error_Write; return false;
 	}
 	
-	char rx_data[BL0940_Len_Readings]; uint8_t cnt_rx;
-	cnt_rx = bl0940_uart_receive(bl0940->uart_port_num, rx_data,
+	uint8_t rx_data[BL0940_Len_Readings]; uint8_t cnt_rx;
+    cnt_rx = bl0940_uart_receive(bl0940->uart_port_num, rx_data,
 	                             sizeof(rx_data), BL0940_Timeout_ms);
 	if (cnt_rx < sizeof(rx_data)) {
 		bl0940->error = BL0940_Error_Read_Len; return false;
@@ -84,7 +85,7 @@ bool bl0940_get_readings(BL0940* bl0940)
 	uint16_t sum = BL0940_Head_Read;
 	sum += bytes_sum(rx_data, sizeof(rx_data) - 1);
 	uint8_t* p_crc = &(rx_data[sizeof(rx_data) - 1]);
-	if (*p_crc != sum & 0xFF) {
+	if (*p_crc != get_sum_byte(sum)) {
 		bl0940->error = BL0940_Error_Read_Crc; return false;
 	}
 	
@@ -116,12 +117,12 @@ bool bl0940_get_readings(BL0940* bl0940)
 
 static uint32_t read_register(BL0940* bl0940, uint8_t reg_addr)
 {
-	char tx_data[] = {BL0940_Head_Read, reg_addr};
+	uint8_t tx_data[] = {BL0940_Head_Read, reg_addr};
 	if (! bl0940_uart_send(bl0940->uart_port_num, tx_data, sizeof(tx_data))) {
 		bl0940->error = BL0940_Error_Write; return 0;
 	}
 	
-	char rx_data[4]; uint8_t cnt_rx;
+	uint8_t rx_data[4]; uint8_t cnt_rx;
 	cnt_rx = bl0940_uart_receive(bl0940->uart_port_num, rx_data,
 	                             sizeof(rx_data), BL0940_Timeout_ms);
 	if (cnt_rx < sizeof(rx_data)) {
@@ -133,7 +134,7 @@ static uint32_t read_register(BL0940* bl0940, uint8_t reg_addr)
 	sum += bytes_sum(rx_data, sizeof(rx_data) - 1);
 	
 	uint8_t* p_crc = &(rx_data[sizeof(rx_data) - 1]);
-	if (*p_crc != sum & 0xFF) {
+	if (*p_crc != get_sum_byte(sum)) {
 		bl0940->error = BL0940_Error_Read_Crc; return 0;
 	}
 	
@@ -145,10 +146,10 @@ static bool write_register(BL0940* bl0940, uint8_t reg_addr, uint32_t val)
 	if (reg_addr != BL0940_Reg_Addr_Write_Protect)
 		write_register(bl0940, BL0940_Reg_Addr_Write_Protect, BL0940_Unlock_User_Reg);
 	
-	char tx_data[6] = {BL0940_Head_Write, reg_addr};
+	uint8_t tx_data[6] = {BL0940_Head_Write, reg_addr};
 	set_triple_bytes(tx_data + 2, val);
 	uint8_t* p_crc = &(tx_data[sizeof(tx_data) - 1]);
-	*p_crc = bytes_sum(tx_data + 2, 3) & 0xFF;
+	*p_crc = get_sum_byte(bytes_sum(tx_data, sizeof(tx_data) - 1));
 	
 	if (! bl0940_uart_send(bl0940->uart_port_num, tx_data, sizeof(tx_data))) {
 		bl0940->error = BL0940_Error_Write; return false;
@@ -171,21 +172,30 @@ static uint16_t bytes_sum(void* data, uint8_t cnt)
 	if (data == (void*)0 || cnt == 0) return 0;
 	
 	uint8_t* p = (uint8_t*)data;
-	uint16_t sum;
+	uint16_t sum = 0;
 	for (int i = 0; i < cnt; i++)
 		sum += p[i];
 	return sum;
 }
 
+static uint8_t get_sum_byte(uint16_t sum)
+{
+	return ~(uint8_t)(sum & 0xFF);
+}
+
 static uint32_t get_triple_bytes(const uint8_t* data)
 {
+	if (data == (void*)0) return 0;
+	
 	return ((uint32_t)data[2] << 16) | 
-           ((uint32_t)data[1] << 8) | 
-           ((uint32_t)data[0]);
+		   ((uint32_t)data[1] << 8) | 
+		   ((uint32_t)data[0]);
 }
 
 static void set_triple_bytes(uint8_t* data, uint32_t val)
 {
+	if (data == (void*)0) return;
+	
 	data[0] = val & 0xFF;
 	data[1] = (val >> 8) & 0xFF;
 	data[2] = (val >> 16) & 0xFF;
@@ -193,7 +203,17 @@ static void set_triple_bytes(uint8_t* data, uint32_t val)
 
 static void set_bits(uint32_t* p_reg, uint32_t val, uint8_t pos, uint8_t size)
 {
-	uint32_t mask = (UINT32_MAX << (pos + size)) | (UINT32_MAX >> (32 - pos));
+	if (p_reg == (void*)0) return;
+	if (pos >= 32) return;
+	if (pos + size > 32) size = 32 - pos;
+
+	// in the mask, set positions to be changed to 0, set others to 1
+	uint32_t mask = 0;
+	if (pos + size < 32)
+		mask = UINT32_MAX << (pos + size); //'1's at left
+	if (pos > 0)
+		mask |= UINT32_MAX >> (32 - pos); //'1's at right
+
 	*p_reg &= mask;
 	*p_reg |= (val << pos) & (~mask);
 }
