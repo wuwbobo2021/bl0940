@@ -36,7 +36,7 @@
 #define BL0940_Coefficient_V                (BL0940_Vref/79931.0/1000)
 #define BL0940_Coefficient_I                (BL0940_Vref/324004.0/1000)
 #define BL0940_Coefficient_W                (BL0940_Vref*BL0940_Vref/4046.0/1000.0/1000)
-#define BL0940_Coefficient_kWh              (BL0940_Coefficient_W * 1638.4*256/3600000)
+#define BL0940_Coefficient_kWh              (BL0940_Coefficient_W * 1638.4*256.0/3600000)
 
 #define BL0940_Reg_Addr_Angle               0x0C
 #define BL0940_Freq_Sample                  1000000
