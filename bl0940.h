@@ -52,14 +52,14 @@ typedef struct {
 	
 	float voltage;
 	float current;
-	float phase_angle;
+	float phase_angle; //degree
 	float power_factor;
 	float power;
-	float energy;
-	float temp_internal;
+	float energy; //kWh
+	float temp_internal; //celsius
 } BL0940;
 
-// implement them as synchronous functions outside this module.
+// implement them as synchronous functions outside this module. 4800,8,N,1.
 // it is better to clear the Rx buffer before sending data in bl0940_uart_send().
 extern bool bl0940_uart_send(uint8_t port_num, const void* data, uint8_t cnt);
 extern uint8_t bl0940_uart_receive(uint8_t port_num, void* data, uint8_t cnt, uint16_t timeout_ms);
